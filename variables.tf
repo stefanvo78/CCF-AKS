@@ -65,12 +65,12 @@ variable "network_service_cidr" {
 
 variable "client_id" {
   description = "SP ID"
-  default     = ""
+  
 }
 
 variable "client_secret" {
   description = "SP Secret"
-  default     = ""
+  
 }
 
 variable "dns_prefix" {
