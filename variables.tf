@@ -22,14 +22,48 @@ variable "kube_vnet_name" {
 }
 
 
-variable "routtablename" {
+variable "routetablename" {
   description = "Route Table Name"
   default     = "RT-JDIK-DEV"
 }
 
+
+variable "akssubsnet_adressprefixes" {
+  description = "IP Range of Non Routable AKS Subnet"
+  type    = list(string)
+  default = ["172.16.0.0/16"]
+}
+
 variable "akssubnet" {
   description = "AKS Subnet name"
-  default     = "subnet-JDIK-DEV"
+  default     = "subnet-JDIK-AKS"
+}
+
+variable "appgwsubsnet_adressprefixes" {
+  description = "IP Range for App Gateway Subnet"
+  type    = list(string)
+  default = ["10.29.30.128/28"]
+}
+
+variable "appgw_private_ip" {
+  description = "Private IP  for App Gateway"
+  default = "10.29.30.132"
+}
+
+
+variable "appgw_publicIP" {
+  description = "Gateway Public IP name"
+  default     = "AppGW_PublicIP"
+}
+
+variable "appgw_name" {
+  description = "Gateway name"
+  default     = "appgw_private_aks"
+}
+
+variable "appgwsubnet" {
+  description = "Gateway Subnet name"
+  default     = "subnet-JDIK-APPGW"
 }
 
 
@@ -65,15 +99,24 @@ variable "network_service_cidr" {
 
 variable "client_id" {
   description = "SP ID"
+  default = "b10d721f-0dbe-4747-99da-8aff656fc25e"
   
 }
 
 variable "client_secret" {
   description = "SP Secret"
-  
+  default = "j-eZ~u1PQAt67v28FK5kG-EvqsfxJGOixD"
+}
+
+variable "spname"{
+  description = " SP Name"
+  default = "http://RT-JDIK-SP-AKS-EON"
 }
 
 variable "dns_prefix" {
     default = "k8stest"
 }
 
+variable "subscription_id" {
+    default = "e7f9758e-74f9-427e-bbdf-6cc2884369a4"
+}

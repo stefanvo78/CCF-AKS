@@ -13,11 +13,133 @@ data "azurerm_resource_group" "spoke" {
 }
 
 #fetch existing subnet 
-data "azurerm_subnet" "aks" {
-	name                 = var.akssubnet
-	virtual_network_name = var.kube_vnet_name
-	resource_group_name  = var.spoke_resource_group_name
+#data "azurerm_subnet" "aks" {
+#name                 = var.akssubnet
+#	virtual_network_name = var.kube_vnet_name
+#	resource_group_name  = var.spoke_resource_group_name
+#}
+
+
+
+
+resource "azurerm_subnet" "aksnet" {
+  name                      = var.akssubnet
+  resource_group_name       = var.spoke_resource_group_name
+  #network_security_group_id = "${azurerm_network_security_group.aksnsg.id}"
+  address_prefixes            = var.akssubsnet_adressprefixes
+  virtual_network_name      = var.kube_vnet_name
+
+  service_endpoints         = ["Microsoft.AzureCosmosDB", "Microsoft.ContainerRegistry", "Microsoft.EventHub", "Microsoft.KeyVault", "Microsoft.ServiceBus", "Microsoft.Sql", "Microsoft.Storage"]
 }
+
+resource "azurerm_subnet" "appgw" {
+  name                      = var.appgwsubnet
+  resource_group_name       = var.spoke_resource_group_name
+  #network_security_group_id = "${azurerm_network_security_group.aksnsg.id}"
+  address_prefixes            = var.appgwsubsnet_adressprefixes
+  virtual_network_name      = var.kube_vnet_name
+
+  service_endpoints         = ["Microsoft.AzureCosmosDB", "Microsoft.ContainerRegistry", "Microsoft.EventHub", "Microsoft.KeyVault", "Microsoft.ServiceBus", "Microsoft.Sql", "Microsoft.Storage"]
+}
+
+resource "azurerm_public_ip" "appgw_ip" {
+  name                = var.appgw_publicIP
+  resource_group_name = var.spoke_resource_group_name
+  location            = var.location
+  allocation_method   = "Static"
+  sku                 = "Standard"
+}
+
+resource "azurerm_application_gateway" "appgw" {
+  name                = var.appgw_name
+  resource_group_name = var.spoke_resource_group_name
+  location            = var.location
+
+  sku {
+    name     = "Standard_v2"
+    tier     = "Standard_v2"
+    capacity = 1
+  }
+
+  gateway_ip_configuration {
+    name      = "my-gateway-ip-configuration"
+    subnet_id = azurerm_subnet.appgw.id
+  }
+
+  frontend_port {
+    name = "frontend-port-name"
+    port = 80
+  }
+
+  frontend_ip_configuration {
+    name                 = "frontend-config-name"
+    public_ip_address_id = azurerm_public_ip.appgw_ip.id
+  }
+
+  frontend_ip_configuration {
+    name                 = "frontend-private-Ip"
+    private_ip_address   = var.appgw_private_ip
+    private_ip_address_allocation = "Static"
+    subnet_id = azurerm_subnet.appgw.id
+  }
+
+  backend_address_pool {
+    name = "backend-pool-name"
+  }
+
+  backend_http_settings {
+    name                  = "http-setting-name"
+    cookie_based_affinity = "Disabled"
+    path                  = "/"
+    port                  = 80
+    protocol              = "Http"
+    request_timeout       = 1
+    connection_draining {
+      enabled = true
+      drain_timeout_sec = 30
+    }
+  }
+
+  probe {
+    name                                        = "probe"
+    protocol                                    = "http"
+    path                                        = "/"
+    interval                                    = "30"
+    timeout                                     = "30"
+    unhealthy_threshold                         = "3"
+    pick_host_name_from_backend_http_settings   = true
+  }
+
+  http_listener {
+    name                           = "listener-name"
+    frontend_ip_configuration_name = "frontend-config-name"
+    frontend_port_name             = "frontend-port-name"
+    protocol                       = "Http"
+  }
+
+  request_routing_rule {
+    name                       = "routing-rule"
+    rule_type                  = "Basic"
+    http_listener_name         = "listener-name"
+    backend_address_pool_name  = "backend-pool-name"
+    backend_http_settings_name = "http-setting-name"
+  }
+}
+
+
+#data "azurerm_route_table" "routetable" {
+#  name                 = var.routetablename
+#	resource_group_name  = var.spoke_resource_group_name
+#  location                = var.location
+#}
+
+
+#resource "azurerm_subnet_route_table_association" "routetable_subnet" {
+#  subnet_id      = azurerm_subnet.aksnet.id
+#  route_table_id = azurerm_route_table.routetable.id
+#}
+
+
 
 resource "azurerm_kubernetes_cluster" "privateaks" {
   name                    = var.aksname
@@ -31,7 +153,7 @@ resource "azurerm_kubernetes_cluster" "privateaks" {
     name           = "default"
     node_count     = var.nodepool_nodes_count
     vm_size        = var.nodepool_vm_size
-    vnet_subnet_id =  data.azurerm_subnet.aks.id
+    vnet_subnet_id =  azurerm_subnet.aksnet.id
   }
 
   # identity {
@@ -42,7 +164,7 @@ resource "azurerm_kubernetes_cluster" "privateaks" {
     docker_bridge_cidr = var.network_docker_bridge_cidr
     dns_service_ip     = var.network_dns_service_ip
     network_plugin     = "azure"
-    outbound_type      = "userDefinedRouting"
+    #outbound_type      = "userDefinedRouting"
     service_cidr       = var.network_service_cidr
   }
 
@@ -54,6 +176,118 @@ resource "azurerm_kubernetes_cluster" "privateaks" {
 }
 
 
+
+#APP Gateway Ingress Config
+data "azurerm_user_assigned_identity" "agicidentity" {
+  name = var.spname
+  resource_group_name = var.spoke_resource_group_name
+  location            = var.location
+  tags = {
+    environment = var.environment
+  }
+}
+
+resource "azurerm_role_assignment" "agicidentityappgw" {
+  scope                = azurerm_application_gateway.appgw.id
+  role_definition_name = "Contributor"
+  principal_id         = var.client_id
+}
+
+resource "azurerm_role_assignment" "agicidentityappgwgroup" {
+  scope                = azurerm_resource_group.spoke.id
+  role_definition_name = "Reader"
+  principal_id         = var.client_id
+}
+
+
+resource "azurerm_role_assignment" "podidentitykubeletoperator" {
+  scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = azurerm_kubernetes_cluster.privateaks.kubelet_identity[0].object_id
+
+  depends_on = [azurerm_kubernetes_cluster.privateaks]
+}
+# try if can be removed
+resource "azurerm_role_assignment" "agicoperator" {
+  scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = var.client_id
+
+  depends_on = [azurerm_kubernetes_cluster.privateaks]
+}
+
+resource "azurerm_role_assignment" "contolleroperator" {
+  scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = azurerm_kubernetes_cluster.privateaks.identity.0.principal_id
+
+  depends_on = [azurerm_kubernetes_cluster.privateaks]
+}
+
+
+
+
+# https://www.terraform.io/docs/providers/helm/release.html
+resource "helm_release" "ingress-azure" {
+  name       = "ingress-azure"
+  repository = "https://appgwingress.blob.core.windows.net/ingress-azure-helm-package/" 
+  chart      = "ingress-azure"
+  namespace  = "kube-system"
+  force_update = "true"
+  timeout = "500"
+
+  set {
+    name  = "appgw.name"
+    value = var.appgw_name
+  }
+
+  set {
+    name  = "appgw.resourceGroup"
+    value = var.spoke_resource_group_name
+  }
+
+  set {
+    name  = "appgw.subscriptionId"
+    value = var.subscription_id
+  }
+
+  set {
+    name  = "appgw.usePrivateIP"
+    value = true
+  }
+
+  set {
+    name  = "appgw.shared"
+    value = false
+  }
+
+  set {
+    name  = "armAuth.type"
+    value = "aadPodIdentity"
+  }
+
+  set {
+    name  = "armAuth.identityClientID"
+    value = azurerm_user_assigned_identity.agicidentity.client_id
+  }
+
+  set {
+    name  = "armAuth.identityResourceID"
+    value = azurerm_user_assigned_identity.agicidentity.id
+  }
+
+  set {
+    name  = "rbac.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "kubernetes.watchNamespace"
+    value = "default"
+  }
+
+  depends_on = [azurerm_kubernetes_cluster.akstf, null_resource.after_charts, helm_release.aad-pod-identity]
+}
 
 
 
