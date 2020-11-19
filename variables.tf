@@ -3,24 +3,39 @@ variable "location" {
   default     = "West Europe"
 }
 
-variable "vnet_resource_group_name" {
-  description = "The resource group name to be created"
-  default     = "networks"
+variable "aksversion" {
+  description = "AKS Version"
+  default     = "1.18.8"
 }
 
-variable "hub_vnet_name" {
-  description = "Hub VNET name"
-  default     = "hub1-firewalvnet"
+variable "aksname" {
+  description = "AKS Version"
+  default     = "private-aks"
 }
+
+
+
 
 variable "kube_vnet_name" {
   description = "AKS VNET name"
-  default     = "spoke1-kubevnet"
+  default     = "VNET-JDIK-DEV"
 }
 
-variable "kube_resource_group_name" {
+
+variable "routtablename" {
+  description = "Route Table Name"
+  default     = "RT-JDIK-DEV"
+}
+
+variable "akssubnet" {
+  description = "AKS Subnet name"
+  default     = "subnet-JDIK-DEV"
+}
+
+
+variable "spoke_resource_group_name" {
   description = "The resource group name to be created"
-  default     = "nopublicipaks"
+  default     = "RG-JDIK-DEV"
 }
 
 variable "nodepool_nodes_count" {
@@ -40,10 +55,25 @@ variable "network_docker_bridge_cidr" {
 
 variable "network_dns_service_ip" {
   description = "CNI DNS service IP"
-  default     = "10.2.0.10"
+  default     = "10.29.31.10"
 }
 
 variable "network_service_cidr" {
   description = "CNI service cidr"
-  default     = "10.2.0.0/24"
+  default     = "10.29.31.0/25"
 }
+
+variable "client_id" {
+  description = "SP ID"
+  default     = ""
+}
+
+variable "client_secret" {
+  description = "SP Secret"
+  default     = ""
+}
+
+variable "dns_prefix" {
+    default = "k8stest"
+}
+
