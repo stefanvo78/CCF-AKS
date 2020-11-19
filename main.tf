@@ -1,5 +1,24 @@
 terraform {
+  
   required_version = ">= 0.12"
+}
+
+provider "kubernetes" {
+  host                   = azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.cluster_ca_certificate)
+}
+
+provider "helm" {
+  kubernetes {
+    load_config_file = false
+    host                   = azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.cluster_ca_certificate)
+    config_path = "ensure-that-we-never-read-kube-config-from-home-dir"
+  }
 }
 
 provider "azurerm" {
@@ -11,15 +30,6 @@ provider "azurerm" {
 data "azurerm_resource_group" "spoke" {
 	name     = var.spoke_resource_group_name
 }
-
-#fetch existing subnet 
-#data "azurerm_subnet" "aks" {
-#name                 = var.akssubnet
-#	virtual_network_name = var.kube_vnet_name
-#	resource_group_name  = var.spoke_resource_group_name
-#}
-
-
 
 
 resource "azurerm_subnet" "aksnet" {
@@ -178,25 +188,22 @@ resource "azurerm_kubernetes_cluster" "privateaks" {
 
 
 #APP Gateway Ingress Config
-data "azurerm_user_assigned_identity" "agicidentity" {
-  name = var.spname
+resource "azurerm_user_assigned_identity" "agicidentity" {
+  name = "${var.aksname}-agic-id"
   resource_group_name = var.spoke_resource_group_name
   location            = var.location
-  tags = {
-    environment = var.environment
-  }
 }
 
 resource "azurerm_role_assignment" "agicidentityappgw" {
   scope                = azurerm_application_gateway.appgw.id
   role_definition_name = "Contributor"
-  principal_id         = var.client_id
+  principal_id         = azurerm_user_assigned_identity.agicidentity.principal_id
 }
 
 resource "azurerm_role_assignment" "agicidentityappgwgroup" {
-  scope                = azurerm_resource_group.spoke.id
+  scope                = data.azurerm_resource_group.spoke.id
   role_definition_name = "Reader"
-  principal_id         = var.client_id
+  principal_id         = azurerm_user_assigned_identity.agicidentity.principal_id
 }
 
 
@@ -211,7 +218,7 @@ resource "azurerm_role_assignment" "podidentitykubeletoperator" {
 resource "azurerm_role_assignment" "agicoperator" {
   scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
   role_definition_name = "Managed Identity Operator"
-  principal_id         = var.client_id
+  principal_id         = azurerm_user_assigned_identity.agicidentity.principal_id
 
   depends_on = [azurerm_kubernetes_cluster.privateaks]
 }
@@ -225,6 +232,73 @@ resource "azurerm_role_assignment" "contolleroperator" {
 }
 
 
+
+
+
+
+
+resource "kubernetes_namespace" "dummy-logger-ns" {
+  metadata {
+    name = "demo"
+  }
+
+  depends_on = [azurerm_kubernetes_cluster.privateaks]
+}
+
+resource "null_resource" "delay_charts" {
+  provisioner "local-exec" {
+    command = "sleep 30"
+  }
+
+  triggers = {
+    "before" = kubernetes_namespace.dummy-logger-ns.id
+  }
+}
+
+resource "null_resource" "after_charts" {
+  depends_on = [null_resource.delay_charts]
+}
+
+
+
+
+
+
+resource "azurerm_role_assignment" "podidentitycontroller" {
+  scope                = data.azurerm_resource_group.spoke.id
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = azurerm_kubernetes_cluster.privateaks.identity.0.principal_id
+
+  depends_on = [azurerm_kubernetes_cluster.privateaks]
+}
+
+resource "azurerm_role_assignment" "podidentitykubelet" {
+  scope                = data.azurerm_resource_group.spoke.id
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = azurerm_kubernetes_cluster.privateaks.kubelet_identity[0].object_id
+
+  depends_on = [azurerm_kubernetes_cluster.privateaks]
+}
+
+resource "azurerm_role_assignment" "podidentitykubeletcontributor" {
+  scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
+  role_definition_name = "Virtual Machine Contributor"
+  principal_id         = azurerm_kubernetes_cluster.privateaks.kubelet_identity[0].object_id
+
+  depends_on = [azurerm_kubernetes_cluster.privateaks]
+}
+
+# https://www.terraform.io/docs/providers/helm/release.html
+resource "helm_release" "aad-pod-identity" {
+  name       = "aad-pod-identity"
+  repository = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts" 
+  chart      = "aad-pod-identity"
+  namespace  = "kube-system"
+  force_update = "true"
+  timeout = "500"
+
+  depends_on = [azurerm_kubernetes_cluster.privateaks, null_resource.after_charts]
+}
 
 
 # https://www.terraform.io/docs/providers/helm/release.html
@@ -286,7 +360,7 @@ resource "helm_release" "ingress-azure" {
     value = "default"
   }
 
-  depends_on = [azurerm_kubernetes_cluster.akstf, null_resource.after_charts, helm_release.aad-pod-identity]
+  depends_on = [azurerm_kubernetes_cluster.privateaks, null_resource.after_charts, helm_release.aad-pod-identity]
 }
 
 

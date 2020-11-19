@@ -99,13 +99,13 @@ variable "network_service_cidr" {
 
 variable "client_id" {
   description = "SP ID"
-  default = "b10d721f-0dbe-4747-99da-8aff656fc25e"
+ 
   
 }
 
 variable "client_secret" {
   description = "SP Secret"
-  default = "j-eZ~u1PQAt67v28FK5kG-EvqsfxJGOixD"
+  
 }
 
 variable "spname"{
