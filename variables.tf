@@ -99,7 +99,7 @@ variable "network_service_cidr" {
 
 variable "client_id" {
   description = "SP ID"
- 
+  
   
 }
 

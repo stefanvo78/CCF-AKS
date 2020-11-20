@@ -3,23 +3,23 @@ terraform {
   required_version = ">= 0.12"
 }
 
-provider "kubernetes" {
-  host                   = azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.cluster_ca_certificate)
-}
+# provider "kubernetes" {
+#   #host                   = azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.host
+#   #client_certificate     = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_certificate)
+#   #client_key             = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_key)
+#   #cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.cluster_ca_certificate)
+# }
 
-provider "helm" {
-  kubernetes {
-    load_config_file = false
-    host                   = azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.host
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_certificate)
-    client_key             = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_key)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.cluster_ca_certificate)
-    config_path = "ensure-that-we-never-read-kube-config-from-home-dir"
-  }
-}
+# provider "helm" {
+#   kubernetes {
+#     load_config_file = false
+#     #host                   = azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.host
+#     #client_certificate     = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_certificate)
+#     #client_key             = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.client_key)
+#     #cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.privateaks.kube_admin_config.0.cluster_ca_certificate)
+#     #config_path = "ensure-that-we-never-read-kube-config-from-home-dir"
+#   }
+# }
 
 provider "azurerm" {
   version = "~>2.5" //outbound_type https://github.com/terraform-providers/terraform-provider-azurerm/blob/v2.5.0/CHANGELOG.md
@@ -188,180 +188,175 @@ resource "azurerm_kubernetes_cluster" "privateaks" {
 
 
 #APP Gateway Ingress Config
-resource "azurerm_user_assigned_identity" "agicidentity" {
-  name = "${var.aksname}-agic-id"
-  resource_group_name = var.spoke_resource_group_name
-  location            = var.location
-}
+# resource "azurerm_user_assigned_identity" "agicidentity" {
+#   name = "${var.aksname}-agic-id"
+#   resource_group_name = var.spoke_resource_group_name
+#   location            = var.location
+# }
 
-resource "azurerm_role_assignment" "agicidentityappgw" {
-  scope                = azurerm_application_gateway.appgw.id
-  role_definition_name = "Contributor"
-  principal_id         = azurerm_user_assigned_identity.agicidentity.principal_id
-}
+# resource "azurerm_role_assignment" "agicidentityappgw" {
+#   scope                = azurerm_application_gateway.appgw.id
+#   role_definition_name = "Contributor"
+#   principal_id         = azurerm_user_assigned_identity.agicidentity.principal_id
+# }
 
-resource "azurerm_role_assignment" "agicidentityappgwgroup" {
-  scope                = data.azurerm_resource_group.spoke.id
-  role_definition_name = "Reader"
-  principal_id         = azurerm_user_assigned_identity.agicidentity.principal_id
-}
+# resource "azurerm_role_assignment" "agicidentityappgwgroup" {
+#   scope                = data.azurerm_resource_group.spoke.id
+#   role_definition_name = "Reader"
+#   principal_id         = azurerm_user_assigned_identity.agicidentity.principal_id
+# }
 
 
-resource "azurerm_role_assignment" "podidentitykubeletoperator" {
-  scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
-  role_definition_name = "Managed Identity Operator"
-  principal_id         = azurerm_kubernetes_cluster.privateaks.kubelet_identity[0].object_id
+# resource "azurerm_role_assignment" "podidentitykubeletoperator" {
+#   scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
+#   role_definition_name = "Managed Identity Operator"
+#   principal_id         = azurerm_kubernetes_cluster.privateaks.kubelet_identity[0].object_id
 
-  depends_on = [azurerm_kubernetes_cluster.privateaks]
-}
+#   depends_on = [azurerm_kubernetes_cluster.privateaks]
+# }
 # try if can be removed
-resource "azurerm_role_assignment" "agicoperator" {
-  scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
-  role_definition_name = "Managed Identity Operator"
-  principal_id         = azurerm_user_assigned_identity.agicidentity.principal_id
+# resource "azurerm_role_assignment" "agicoperator" {
+#   scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
+#   role_definition_name = "Managed Identity Operator"
+#   principal_id         = azurerm_user_assigned_identity.agicidentity.principal_id
 
-  depends_on = [azurerm_kubernetes_cluster.privateaks]
-}
+#   depends_on = [azurerm_kubernetes_cluster.privateaks]
+# }
 
-resource "azurerm_role_assignment" "contolleroperator" {
-  scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
-  role_definition_name = "Managed Identity Operator"
-  principal_id         = azurerm_kubernetes_cluster.privateaks.identity.0.principal_id
+# resource "azurerm_role_assignment" "contolleroperator" {
+#   scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
+#   role_definition_name = "Managed Identity Operator"
+#   principal_id         = azurerm_kubernetes_cluster.privateaks.identity.0.principal_id
 
-  depends_on = [azurerm_kubernetes_cluster.privateaks]
-}
-
-
+#   depends_on = [azurerm_kubernetes_cluster.privateaks]
+# }
 
 
+# resource "kubernetes_namespace" "dummy-logger-ns" {
+#   metadata {
+#     name = "demo"
+#   }
 
+#   depends_on = [azurerm_kubernetes_cluster.privateaks]
+# }
 
+# resource "null_resource" "delay_charts" {
+#   provisioner "local-exec" {
+#     command = "sleep 30"
+#   }
 
-resource "kubernetes_namespace" "dummy-logger-ns" {
-  metadata {
-    name = "demo"
-  }
+#   triggers = {
+#     "before" = kubernetes_namespace.dummy-logger-ns.id
+#   }
+# }
 
-  depends_on = [azurerm_kubernetes_cluster.privateaks]
-}
-
-resource "null_resource" "delay_charts" {
-  provisioner "local-exec" {
-    command = "sleep 30"
-  }
-
-  triggers = {
-    "before" = kubernetes_namespace.dummy-logger-ns.id
-  }
-}
-
-resource "null_resource" "after_charts" {
-  depends_on = [null_resource.delay_charts]
-}
+# resource "null_resource" "after_charts" {
+#   depends_on = [null_resource.delay_charts]
+# }
 
 
 
 
 
 
-resource "azurerm_role_assignment" "podidentitycontroller" {
-  scope                = data.azurerm_resource_group.spoke.id
-  role_definition_name = "Managed Identity Operator"
-  principal_id         = azurerm_kubernetes_cluster.privateaks.identity.0.principal_id
+# resource "azurerm_role_assignment" "podidentitycontroller" {
+#   scope                = data.azurerm_resource_group.spoke.id
+#   role_definition_name = "Managed Identity Operator"
+#   principal_id         = azurerm_kubernetes_cluster.privateaks.identity.0.principal_id
 
-  depends_on = [azurerm_kubernetes_cluster.privateaks]
-}
+#   depends_on = [azurerm_kubernetes_cluster.privateaks]
+# }
 
-resource "azurerm_role_assignment" "podidentitykubelet" {
-  scope                = data.azurerm_resource_group.spoke.id
-  role_definition_name = "Managed Identity Operator"
-  principal_id         = azurerm_kubernetes_cluster.privateaks.kubelet_identity[0].object_id
+# resource "azurerm_role_assignment" "podidentitykubelet" {
+#   scope                = data.azurerm_resource_group.spoke.id
+#   role_definition_name = "Managed Identity Operator"
+#   principal_id         = azurerm_kubernetes_cluster.privateaks.kubelet_identity[0].object_id
 
-  depends_on = [azurerm_kubernetes_cluster.privateaks]
-}
+#   depends_on = [azurerm_kubernetes_cluster.privateaks]
+# }
 
-resource "azurerm_role_assignment" "podidentitykubeletcontributor" {
-  scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
-  role_definition_name = "Virtual Machine Contributor"
-  principal_id         = azurerm_kubernetes_cluster.privateaks.kubelet_identity[0].object_id
+# resource "azurerm_role_assignment" "podidentitykubeletcontributor" {
+#   scope                = "/subscriptions/${var.subscription_id}/resourceGroups/${azurerm_kubernetes_cluster.privateaks.node_resource_group}"
+#   role_definition_name = "Virtual Machine Contributor"
+#   principal_id         = azurerm_kubernetes_cluster.privateaks.kubelet_identity[0].object_id
 
-  depends_on = [azurerm_kubernetes_cluster.privateaks]
-}
+#   depends_on = [azurerm_kubernetes_cluster.privateaks]
+#}
 
 # https://www.terraform.io/docs/providers/helm/release.html
-resource "helm_release" "aad-pod-identity" {
-  name       = "aad-pod-identity"
-  repository = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts" 
-  chart      = "aad-pod-identity"
-  namespace  = "kube-system"
-  force_update = "true"
-  timeout = "500"
+# resource "helm_release" "aad-pod-identity" {
+#   name       = "aad-pod-identity"
+#   repository = "https://raw.githubusercontent.com/Azure/aad-pod-identity/master/charts" 
+#   chart      = "aad-pod-identity"
+#   namespace  = "kube-system"
+#   force_update = "true"
+#   timeout = "500"
 
-  depends_on = [azurerm_kubernetes_cluster.privateaks, null_resource.after_charts]
-}
+#   depends_on = [azurerm_kubernetes_cluster.privateaks, null_resource.after_charts]
+# }
 
 
-# https://www.terraform.io/docs/providers/helm/release.html
-resource "helm_release" "ingress-azure" {
-  name       = "ingress-azure"
-  repository = "https://appgwingress.blob.core.windows.net/ingress-azure-helm-package/" 
-  chart      = "ingress-azure"
-  namespace  = "kube-system"
-  force_update = "true"
-  timeout = "500"
+# # https://www.terraform.io/docs/providers/helm/release.html
+# resource "helm_release" "ingress-azure" {
+#   name       = "ingress-azure"
+#   repository = "https://appgwingress.blob.core.windows.net/ingress-azure-helm-package/" 
+#   chart      = "ingress-azure"
+#   namespace  = "kube-system"
+#   force_update = "true"
+#   timeout = "500"
 
-  set {
-    name  = "appgw.name"
-    value = var.appgw_name
-  }
+#   set {
+#     name  = "appgw.name"
+#     value = var.appgw_name
+#   }
 
-  set {
-    name  = "appgw.resourceGroup"
-    value = var.spoke_resource_group_name
-  }
+#   set {
+#     name  = "appgw.resourceGroup"
+#     value = var.spoke_resource_group_name
+#   }
 
-  set {
-    name  = "appgw.subscriptionId"
-    value = var.subscription_id
-  }
+#   set {
+#     name  = "appgw.subscriptionId"
+#     value = var.subscription_id
+#   }
 
-  set {
-    name  = "appgw.usePrivateIP"
-    value = true
-  }
+#   set {
+#     name  = "appgw.usePrivateIP"
+#     value = true
+#   }
 
-  set {
-    name  = "appgw.shared"
-    value = false
-  }
+#   set {
+#     name  = "appgw.shared"
+#     value = false
+#   }
 
-  set {
-    name  = "armAuth.type"
-    value = "aadPodIdentity"
-  }
+#   set {
+#     name  = "armAuth.type"
+#     value = "aadPodIdentity"
+#   }
 
-  set {
-    name  = "armAuth.identityClientID"
-    value = azurerm_user_assigned_identity.agicidentity.client_id
-  }
+#   set {
+#     name  = "armAuth.identityClientID"
+#     value = azurerm_user_assigned_identity.agicidentity.client_id
+#   }
 
-  set {
-    name  = "armAuth.identityResourceID"
-    value = azurerm_user_assigned_identity.agicidentity.id
-  }
+#   set {
+#     name  = "armAuth.identityResourceID"
+#     value = azurerm_user_assigned_identity.agicidentity.id
+#   }
 
-  set {
-    name  = "rbac.enabled"
-    value = "true"
-  }
+#   set {
+#     name  = "rbac.enabled"
+#     value = "true"
+#   }
 
-  set {
-    name  = "kubernetes.watchNamespace"
-    value = "default"
-  }
+#   set {
+#     name  = "kubernetes.watchNamespace"
+#     value = "default"
+#   }
 
-  depends_on = [azurerm_kubernetes_cluster.privateaks, null_resource.after_charts, helm_release.aad-pod-identity]
-}
+#   depends_on = [azurerm_kubernetes_cluster.privateaks, null_resource.after_charts, helm_release.aad-pod-identity]
+# }
 
 
 
